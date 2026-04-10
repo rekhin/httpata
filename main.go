@@ -262,17 +262,14 @@ func buildRequestBody(cfg config) (io.Reader, error) {
 }
 
 func applyJSONata(body []byte, exprStr string) ([]byte, error) {
-	var data interface{}
-	if err := json.Unmarshal(body, &data); err != nil {
-		return nil, fmt.Errorf("response body is not valid JSON: %w", err)
-	}
+	rawJSON := json.RawMessage(body)
 
 	expr, err := gnata.Compile(exprStr)
 	if err != nil {
 		return nil, fmt.Errorf("compiling JSONata expression: %w", err)
 	}
 
-	result, err := expr.Eval(context.Background(), data)
+	result, err := expr.EvalBytes(context.Background(), rawJSON)
 	if err != nil {
 		return nil, fmt.Errorf("evaluating JSONata: %w", err)
 	}
