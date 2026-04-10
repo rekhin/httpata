@@ -35,6 +35,7 @@ type config struct {
 	dataFile string
 	jsonata  string
 	timeout  time.Duration
+	pretty   bool
 	useRaw   bool
 }
 
@@ -100,17 +101,26 @@ func main() {
 	// always print status line to stderr
 	fmt.Fprintf(os.Stderr, "HTTP %d %s\n", resp.StatusCode, http.StatusText(resp.StatusCode))
 
-	// apply JSONata if requested
+	// prepare output: apply JSONata if needed, then maybe pretty-print
+	output := respBody
 	if cfg.jsonata != "" {
 		transformed, err := applyJSONata(respBody, cfg.jsonata)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "JSONata error: %v\n", err)
 			os.Exit(exitJSONataError)
 		}
-		fmt.Println(string(transformed))
-	} else {
-		fmt.Println(string(respBody))
+		output = transformed
 	}
+
+	if cfg.pretty {
+		prettyOut, err := prettyPrintJSON(output)
+		if err == nil {
+			output = prettyOut
+		}
+		// if not valid JSON, keep original output (do nothing)
+	}
+
+	fmt.Println(string(output))
 }
 
 func parseFlags() config {
@@ -123,6 +133,7 @@ func parseFlags() config {
 		rawFile  string
 		jsonata  string
 		timeout  int
+		pretty   bool
 	)
 
 	flag.StringVar(&method, "method", "GET", "HTTP method (used when -raw is not set)")
@@ -133,6 +144,8 @@ func parseFlags() config {
 	flag.StringVar(&rawFile, "raw", "", "File containing raw HTTP request (RFC 2616). If not set but no other flags given, reads from stdin.")
 	flag.StringVar(&jsonata, "jsonata", "", "JSONata expression to transform response")
 	flag.IntVar(&timeout, "timeout", 30, "Request timeout in seconds")
+	flag.BoolVar(&pretty, "pretty", false, "Pretty-print JSON response (indented)")
+	flag.BoolVar(&pretty, "p", false, "Shorthand for -pretty")
 
 	flag.Parse()
 
@@ -145,6 +158,7 @@ func parseFlags() config {
 		rawFile:  rawFile,
 		jsonata:  jsonata,
 		timeout:  time.Duration(timeout) * time.Second,
+		pretty:   pretty,
 		useRaw:   rawFile != "" || (rawFile == "" && flag.NFlag() == 0 && flag.NArg() == 0),
 	}
 
@@ -279,4 +293,13 @@ func applyJSONata(body []byte, exprStr string) ([]byte, error) {
 		return nil, fmt.Errorf("marshaling JSONata result: %w", err)
 	}
 	return out, nil
+}
+
+func prettyPrintJSON(body []byte) ([]byte, error) {
+	var out bytes.Buffer
+	err := json.Indent(&out, body, "", "  ")
+	if err != nil {
+		return body, err
+	}
+	return out.Bytes(), nil
 }
