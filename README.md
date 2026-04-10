@@ -92,6 +92,7 @@ See the [JSONata Guide](https://github.com/tlcsdm/vscode-json-tree-view/blob/HEA
 - `-raw`           Path to a raw HTTP request file (`request.http`, RFC 2616). If not set and no other flags, reads from stdin.
 - `-jsonata`       JSONata expression to transform the JSON response
 - `-timeout`       Request timeout in seconds (default: 30)
+- `-pretty, -p`    Pretty-print JSON response (indented with 2 spaces)
 
 ## RFC 2616 Support
 
