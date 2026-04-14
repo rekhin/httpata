@@ -112,6 +112,8 @@ func main() {
 		output = transformed
 	}
 
+	output = unescapeUnicode(output)
+
 	if cfg.pretty {
 		prettyOut, err := prettyPrintJSON(output)
 		if err == nil {
@@ -293,6 +295,33 @@ func applyJSONata(body []byte, exprStr string) ([]byte, error) {
 		return nil, fmt.Errorf("marshaling JSONata result: %w", err)
 	}
 	return out, nil
+}
+
+// unescapeUnicode converts \uXXXX sequences to actual Unicode characters
+func unescapeUnicode(data []byte) []byte {
+	// Try to parse as JSON to decode unicode escapes
+	var decoded interface{}
+	if err := json.Unmarshal(data, &decoded); err == nil {
+		// Re-marshal with SetEscapeHTML(false) to keep unicode characters as-is
+		buffer := &bytes.Buffer{}
+		encoder := json.NewEncoder(buffer)
+		encoder.SetEscapeHTML(false)
+		if err := encoder.Encode(decoded); err == nil {
+			// Remove trailing newline added by Encode
+			result := bytes.TrimSpace(buffer.Bytes())
+			return result
+		}
+	}
+
+	// If not valid JSON, try to unescape as string
+	if len(data) > 0 && data[0] == '"' && data[len(data)-1] == '"' {
+		var unquoted string
+		if err := json.Unmarshal(data, &unquoted); err == nil {
+			return []byte(unquoted)
+		}
+	}
+
+	return data
 }
 
 func prettyPrintJSON(body []byte) ([]byte, error) {
